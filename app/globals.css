@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f5f9;
+  --color-surface-hover: #e2e8f0;
+
+  --color-border: #e2e8f0;
+  --color-border-light: #f8fafc;
+
+  /* Colors */
+  --color-primary: #3b82f6;
+  --color-primary-light: #60a5fa;
+  --color-primary-dark: #2563eb;
+
+  /* Status Colors */
+  --color-alert: #dc2626;
+  --color-alert-bg: #fef2f2;
+  --color-alert-border: #fca5a5;
+  
+  --color-occupied: #2563eb;
+  --color-occupied-bg: #eff6ff;
+  --color-occupied-border: #bfdbfe;
+
+  --color-empty: #64748b;
+  --color-empty-bg: #f8fafc;
+  --color-empty-border: #cbd5e1;
+
+  --color-offline: #6b7280;
+  --color-offline-bg: #f9fafb;
+  --color-offline-border: #d1d5db;
+
+  /* Typography */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94a3b8;
+
+  /* Borders & Shadows */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-inter), var(--font-noto-sans-thai), sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: var(--shadow-sm);
+  }
+
+  @keyframes pulse-border {
+    0% {
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+    70% {
+      box-shadow: 0 0 0 15px rgba(220, 38, 38, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+  }
+
+  .animate-alert-border {
+    animation: pulse-border 1.5s infinite;
+    border-color: var(--color-alert) !important;
+  }
+}
