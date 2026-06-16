@@ -10,7 +10,7 @@ interface BedCardProps {
   onClick: () => void
 }
 
-type UiStatus = 'occupied' | 'empty' | 'alert' | 'offline'
+type UiStatus = 'occupied' | 'empty' | 'alert' | 'warning' | 'offline'
 
 const STATUS_CONFIG: Record<UiStatus, {
   label: string
@@ -40,6 +40,13 @@ const STATUS_CONFIG: Record<UiStatus, {
     borderClass: 'border-alert-border',
     badgeBg: 'bg-alert'
   },
+  warning: {
+    label: 'WARNING',
+    colorClass: 'text-yellow-600',
+    bgClass: 'bg-yellow-50',
+    borderClass: 'border-yellow-400',
+    badgeBg: 'bg-yellow-500'
+  },
   offline: {
     label: 'OFFLINE',
     colorClass: 'text-offline',
@@ -52,6 +59,7 @@ const STATUS_CONFIG: Record<UiStatus, {
 function getUiStatus(bed: BedState): UiStatus {
   if (bed.deviceStatus === 'offline') return 'offline'
   if (bed.alert) return 'alert'
+  if (bed.warning) return 'warning'
   if (bed.patientId) return 'occupied'
   return 'empty'
 }
@@ -63,33 +71,47 @@ export default function BedCard({ bed, isSelected, onClick }: BedCardProps) {
   const status = getUiStatus(bed)
   const cfg = STATUS_CONFIG[status]
   const isAlert = status === 'alert'
+  const isWarning = status === 'warning'
 
   const formattedTime = mounted && bed.updatedAt
     ? new Date(bed.updatedAt).toLocaleTimeString('th-TH', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
     : '--:--:--'
+
+  const isMonitoringPaused = bed.patientId && !bed.isMonitoringActive
+  const badgeLabel = isMonitoringPaused ? 'PAUSED' : cfg.label
+  const badgeBgClass = isMonitoringPaused
+    ? 'bg-yellow-50 border-yellow-200 text-yellow-600'
+    : `${cfg.bgClass} border ${cfg.borderClass} ${cfg.colorClass}`
+  const badgeIndicatorColor = isMonitoringPaused ? 'bg-yellow-500' : cfg.badgeBg
 
   return (
     <div
       onClick={onClick}
-      className={`bg-surface border-2 ${isSelected ? 'border-primary shadow-[0_0_0_4px_rgba(59,130,246,0.1)]' : `${cfg.borderClass} shadow-sm`} rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02] relative flex flex-col justify-between h-full min-h-[180px] ${isAlert ? 'animate-alert-border' : ''}`}
+      className={`bg-surface border-2 ${
+        isSelected
+          ? 'border-primary shadow-[0_0_0_4px_rgba(59,130,246,0.1)]'
+          : isMonitoringPaused
+          ? 'border-yellow-300 bg-yellow-50/10 shadow-sm'
+          : `${cfg.borderClass} shadow-sm`
+      } rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02] relative flex flex-col justify-between h-full min-h-[180px] ${isAlert ? 'animate-alert-border' : ''} ${isWarning ? 'border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.3)]' : ''}`}
     >
       {/* Top Section */}
       <div className="flex justify-between items-start">
-        <div className={`text-[32px] font-extrabold ${cfg.colorClass} leading-none tracking-[-1px]`}>
+        <div className={`text-[32px] font-extrabold ${isMonitoringPaused ? 'text-yellow-600' : cfg.colorClass} leading-none tracking-[-1px]`}>
           {bed.bedName}
         </div>
-        
+ 
         {/* Status Badge */}
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${cfg.bgClass} border ${cfg.borderClass} ${cfg.colorClass} text-[10px] font-extrabold tracking-[0.5px] uppercase`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${cfg.badgeBg} shadow-[0_0_6px] ${isAlert ? 'animate-[pulse-border_1s_infinite]' : ''}`} />
-          {cfg.label}
+        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${badgeBgClass} text-[10px] font-extrabold tracking-[0.5px] uppercase`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${badgeIndicatorColor} shadow-[0_0_6px] ${isAlert ? 'animate-[pulse-border_1s_infinite]' : ''}`} />
+          {badgeLabel}
         </div>
       </div>
-
+ 
       {/* Alert Indicator */}
       <div className="my-4 relative h-6 flex items-center justify-end">
         {isAlert && bed.alertTime && mounted && (
@@ -98,8 +120,19 @@ export default function BedCard({ bed, isSelected, onClick }: BedCardProps) {
             Since {new Date(bed.alertTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
           </div>
         )}
+        {isWarning && bed.alertTime && mounted && (
+          <div className="text-yellow-600 flex items-center gap-1 text-xs font-bold">
+            <AlertCircle size={14} />
+            Warning: Sitting Up
+          </div>
+        )}
+        {isMonitoringPaused && mounted && !isAlert && !isWarning && (
+          <div className="text-yellow-600 flex items-center gap-1 text-[11px] font-bold">
+            ⚠️ ตรวจจับผู้ป่วยลุกปิดอยู่
+          </div>
+        )}
       </div>
-
+ 
       {/* Bottom Section: Patient Info */}
       <div className="bg-surface-2 rounded-xl p-2.5 mt-auto">
         {bed.patientId ? (
@@ -118,11 +151,11 @@ export default function BedCard({ bed, isSelected, onClick }: BedCardProps) {
           </div>
         ) : (
           <div className="text-xs text-text-tertiary font-medium text-center py-1 flex items-center justify-center gap-2">
-             No Patient
+            No Patient
           </div>
         )}
       </div>
-
+ 
       {/* Timestamp */}
       <div className="text-[10px] text-text-tertiary font-medium text-right mt-2">
         UPDATED: {formattedTime}

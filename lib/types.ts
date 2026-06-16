@@ -2,15 +2,11 @@
 // BedSafe — Shared Types
 // ==============================
 
-/** ข้อมูลที่ ESP32 ส่งมาผ่าน MQTT */
-export interface MqttPayload {
-  bedId: number
-  patientId: string
-  patientName: string
-  deviceStatus: 'online' | 'offline'
-  alert: boolean
-  alertTime: string | null
-  updatedAt: string
+/** ข้อมูล alert ที่ ESP32 ส่งมาผ่าน MQTT (bedsafe/+/alert) */
+export interface MqttAlertPayload {
+  top: number    // 1 = warning
+  left: number   // 1 = alert
+  right: number  // 1 = alert
 }
 
 /** สถานะเตียงที่ใช้แสดงใน Dashboard */
@@ -21,9 +17,14 @@ export interface BedState {
   patientName: string | null
   patientAge: number | null
   deviceStatus: 'online' | 'offline'
-  alert: boolean
+  alert: boolean          // Left หรือ Right = 1
+  warning: boolean        // Top = 1 (แค่เตือน ไม่ส่งเสียง)
   alertTime: string | null
   updatedAt: string       // ISO string
+  isMonitoringActive: boolean
+  sensorTop: number
+  sensorLeft: number
+  sensorRight: number
 }
 
 /** ข้อมูลจาก Google Sheets (Sheet: Beds) */

@@ -5,9 +5,11 @@ import type { Patients, Beds, AlertHistory } from './types'
 // Google Sheets API Helper
 // ==============================
 
-const SHEETS_ID = process.env.GOOGLE_SHEETS_ID!
+const SHEETS_ID = process.env.GOOGLE_SHEETS_ID || process.env.GOOGLE_SHEET_ID || ''
 const CLIENT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!
-const PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n')
+const PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? '')
+  .replace(/^"|"$/g, '')
+  .replace(/\\n/g, '\n')
 
 /** สร้าง Google Sheets authenticated client */
 function getAuth() {
@@ -164,5 +166,130 @@ export async function appendAlertHistory(event: {
     })
   } catch (err) {
     console.error('[Sheets] appendAlertHistory error:', err)
+  }
+}
+
+/** กำหนดข้อมูลคนไข้ให้กับเตียงใน Sheets */
+export async function assignPatientToBed(
+  bedId: number,
+  patientId: string,
+  patientName: string,
+  patientAge: number
+): Promise<void> {
+  try {
+    const sheets = getSheetsClient()
+
+    // 1. อัปเดตข้อมูลใน Sheet "Beds"
+    const beds = await getBeds()
+    const bedIndex = beds.findIndex((b) => b.bedId === bedId)
+    if (bedIndex !== -1) {
+      const sheetRow = bedIndex + 2
+      // อัปเดต patientId (C) และ patientName (D) พร้อมกัน
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Beds!C${sheetRow}:D${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[patientId, patientName]] },
+      })
+      // อัปเดต status (F) เป็น active
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Beds!F${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [['active']] },
+      })
+    }
+
+    // 2. อัปเดตข้อมูลใน Sheet "Patients"
+    const patients = await getPatients()
+    const patientIndex = patients.findIndex((p) => p.patientId === patientId)
+    const todayStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+
+    if (patientIndex !== -1) {
+      const sheetRow = patientIndex + 2
+      // อัปเดตข้อมูลเดิมที่มีอยู่แล้ว
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Patients!B${sheetRow}:C${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[patientName, patientAge]] },
+      })
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Patients!E${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[bedId]] },
+      })
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Patients!H${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [['active']] },
+      })
+    } else {
+      // เพิ่มคนไข้รายใหม่ลงท้ายตาราง
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEETS_ID,
+        range: 'Patients!A:H',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: {
+          values: [[patientId, patientName, patientAge, 'Stroke Unit', bedId, todayStr, '', 'active']],
+        },
+      })
+    }
+  } catch (err) {
+    console.error('[Sheets] assignPatientToBed error:', err)
+  }
+}
+
+/** จำหน่ายคนไข้หรือย้ายคนไข้ออกจากเตียงใน Sheets */
+export async function dischargePatient(bedId: number, patientId: string): Promise<void> {
+  try {
+    const sheets = getSheetsClient()
+
+    // 1. อัปเดตข้อมูลใน Sheet "Beds" (ล้างข้อมูลคนไข้)
+    const beds = await getBeds()
+    const bedIndex = beds.findIndex((b) => b.bedId === bedId)
+    if (bedIndex !== -1) {
+      const sheetRow = bedIndex + 2
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Beds!C${sheetRow}:D${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [['', '']] },
+      })
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Beds!F${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [['empty']] },
+      })
+    }
+
+    // 2. อัปเดตข้อมูลใน Sheet "Patients"
+    const patients = await getPatients()
+    const patientIndex = patients.findIndex((p) => p.patientId === patientId && p.status === 'active')
+    const todayStr = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+
+    if (patientIndex !== -1) {
+      const sheetRow = patientIndex + 2
+      // ปลด bedId เป็น 0 (ไม่มีเตียง)
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Patients!E${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[0]] },
+      })
+      // บันทึกวันที่จำหน่าย (G) และปรับสถานะเป็น discharged (H)
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEETS_ID,
+        range: `Patients!G${sheetRow}:H${sheetRow}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[todayStr, 'discharged']] },
+      })
+    }
+  } catch (err) {
+    console.error('[Sheets] dischargePatient error:', err)
   }
 }

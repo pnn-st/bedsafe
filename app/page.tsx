@@ -7,23 +7,13 @@ import BedCard from '@/components/BedCard'
 import dynamic from 'next/dynamic'
 const DetailPanel = dynamic(() => import('@/components/DetailPanel'), { ssr: false })
 import AlertTable from '@/components/AlertTable'
+import { useAudioAlarm } from '@/hooks/useAudioAlarm'
 import type { BedState, AlertHistory, DashboardSummary, SseMessage } from '@/lib/types'
 
 // ข้อมูล Mock ถูกเอาออกเพื่อให้ดึงข้อมูลจาก Server-Sent Events อย่างเดียวเท่านั้น
 const MOCK_BEDS: BedState[] = []
 
-const MOCK_EVENTS: AlertHistory[] = [
-  {
-    time: new Date(Date.now() - 60000).toISOString(),
-    bedId: 4, patientId: 'P004', patientName: 'อนันต์ สุขใจ',
-    event: 'PATIENT_LEFT_BED', deviceStatus: 'online', note: 'Patient left the bed',
-  },
-  {
-    time: new Date(Date.now() - 300000).toISOString(),
-    bedId: 5, patientId: '', patientName: '',
-    event: 'DEVICE_OFFLINE', deviceStatus: 'offline', note: 'No MQTT signal within 30 seconds',
-  },
-]
+const MOCK_EVENTS: AlertHistory[] = []
 
 export default function DashboardPage() {
   const [beds, setBeds] = useState<BedState[]>(MOCK_BEDS)
@@ -33,7 +23,6 @@ export default function DashboardPage() {
   const sseRef = useRef<EventSource | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // คำนวณ Summary
   const summary: DashboardSummary = {
     totalBeds: 6,
     devicesOnline: beds.filter((b) => b.deviceStatus === 'online').length,
@@ -41,23 +30,30 @@ export default function DashboardPage() {
     activeAlerts: beds.filter((b) => b.alert).length,
   }
 
+  const activeWarnings = beds.filter((b) => b.warning && !b.alert).length
+
+  let alarmType: 'none' | 'warning' | 'alert' = 'none'
+  if (summary.activeAlerts > 0) {
+    alarmType = 'alert'
+  } else if (activeWarnings > 0) {
+    alarmType = 'warning'
+  }
+
+  const { isAudioEnabled } = useAudioAlarm(alarmType)
+
   const selectedBed = selectedBedId ? beds.find((b) => b.bedId === selectedBedId) ?? null : null
 
-  // แจ้งเตือนเสียงเมื่อมี Alert
+  // ดึงประวัติแจ้งเตือนจาก Database ตอนโหลดหน้าแรก
   useEffect(() => {
-    if (summary.activeAlerts > 0) {
-      if (!audioRef.current) {
-        audioRef.current = new Audio('/alert-sound.mp3') // Assume this exists or user adds it later
-        audioRef.current.loop = true
-      }
-      audioRef.current.play().catch((err) => console.log('Audio autoplay prevented:', err))
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
-      }
-    }
-  }, [summary.activeAlerts])
+    fetch('/api/history')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.events && Array.isArray(data.events)) {
+          setEvents(data.events.slice(0, 50)) // เอา 50 รายการล่าสุดมาโชว์
+        }
+      })
+      .catch((err) => console.error('Failed to load history:', err))
+  }, [])
 
   // อัปเดตสถานะเตียงเมื่อได้รับข้อมูลจาก SSE
   const handleBedUpdate = useCallback((updated: BedState) => {
@@ -142,6 +138,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Banner เตือนให้คลิกหน้าจอถ้าเบราว์เซอร์ยังบล็อคเสียงอยู่ */}
+      {!isAudioEnabled && (
+        <div className="bg-alert-bg text-alert text-center text-xs py-1.5 font-semibold">
+          ⚠️ กรุณาคลิกที่ใดก็ได้บนหน้าจอหนึ่งครั้ง เพื่ออนุญาตให้ระบบเล่นเสียงแจ้งเตือนได้
+        </div>
+      )}
       <HeaderBar mqttConnected={mqttConnected} />
 
       <main className="max-w-[1440px] mx-auto p-6 flex flex-col gap-6">
@@ -156,7 +158,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2.5">
                 <div className="text-primary-dark">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4v16" /><path d="M2 8h18a2 2 0 0 1 2 2v10" /><path d="M2 17h20" /><path d="M6 8v9" /></svg>
                 </div>
                 <div>
                   <div className="font-extrabold text-base text-text-primary uppercase tracking-[0.5px]">Bed Map</div>
@@ -168,7 +170,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 flex-wrap justify-end">
                 {legends.map((l) => (
                   <div key={l.label} className="flex items-center gap-1">
-                    <span className={`w-2.5 h-2.5 rounded-sm ${l.colorClass} shrink-0`} />
+                    <span className={`w-2.5 h-2.5 rounded-full ${l.colorClass} shrink-0`} />
                     <span className="text-[10px] text-text-secondary">{l.label}</span>
                   </div>
                 ))}
@@ -192,7 +194,7 @@ export default function DashboardPage() {
           <div>
             <div className="mb-3 flex items-center gap-2.5">
               <div className="text-primary-dark">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M8 12h8" /><path d="M12 8v8" /></svg>
               </div>
               <span className="font-extrabold text-base text-text-primary uppercase tracking-[0.5px]">รายละเอียดเตียง</span>
             </div>
@@ -213,7 +215,7 @@ export default function DashboardPage() {
             <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-surface-2">
               <div className="flex items-center gap-2.5">
                 <div className="text-primary-dark">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                 </div>
                 <span className="font-bold text-sm text-text-primary uppercase tracking-[0.5px]">
                   ผู้ป่วยบนเตียง
@@ -256,7 +258,7 @@ export default function DashboardPage() {
 
       {/* Footer */}
       <footer className="text-center p-4 text-[11px] text-text-muted border-t border-border mt-2">
-        © 2024 BedSafe — Bed Monitoring System | Hospital Dashboard
+        © BedSafe — Bed Monitoring System | Hospital Dashboard
       </footer>
     </div>
   )

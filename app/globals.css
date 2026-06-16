@@ -21,13 +21,13 @@
   --color-alert-bg: #fef2f2;
   --color-alert-border: #fca5a5;
   
-  --color-occupied: #2563eb;
-  --color-occupied-bg: #eff6ff;
-  --color-occupied-border: #bfdbfe;
+  --color-occupied: #16a34a;
+  --color-occupied-bg: #f0fdf4;
+  --color-occupied-border: #bbf7d0;
 
-  --color-empty: #64748b;
-  --color-empty-bg: #f8fafc;
-  --color-empty-border: #cbd5e1;
+  --color-empty: #eab308;
+  --color-empty-bg: #fefce8;
+  --color-empty-border: #fef08a;
 
   --color-offline: #6b7280;
   --color-offline-bg: #f9fafb;
@@ -81,4 +81,31 @@
     animation: pulse-border 1.5s infinite;
     border-color: var(--color-alert) !important;
   }
+}
+
+/* Force overrides for occupied (green) and empty (yellow) status colors to bypass caching issues */
+.bg-occupied {
+  background-color: #16a34a !important;
+}
+.bg-occupied-bg {
+  background-color: #f0fdf4 !important;
+}
+.border-occupied-border {
+  border-color: #bbf7d0 !important;
+}
+.text-occupied {
+  color: #16a34a !important;
+}
+
+.bg-empty {
+  background-color: #eab308 !important;
+}
+.bg-empty-bg {
+  background-color: #fefce8 !important;
+}
+.border-empty-border {
+  border-color: #fef08a !important;
+}
+.text-empty {
+  color: #eab308 !important;
 }

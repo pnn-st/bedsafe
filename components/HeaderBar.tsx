@@ -28,7 +28,7 @@ export default function HeaderBar({ mqttConnected, brokerUrl = 'localhost:1883' 
   return (
     <header className="bg-surface border-b border-border shadow-sm sticky top-0 z-50">
       <div className="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between gap-4">
-        
+
         {/* Logo + Title */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-light to-primary-dark flex items-center justify-center text-white shrink-0 shadow-[0_2px_4px_rgba(37,99,235,0.3)]">
@@ -85,10 +85,10 @@ export default function HeaderBar({ mqttConnected, brokerUrl = 'localhost:1883' 
             </div>
             <div>
               <div className="text-xs font-bold text-text-primary">
-                Nurse Station
+                Staff Station
               </div>
               <div className="text-[11px] text-text-tertiary font-medium">
-                ICU Ward
+                Stroke Ward
               </div>
             </div>
           </div>

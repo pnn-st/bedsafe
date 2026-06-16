@@ -23,6 +23,7 @@ export default function HistoryPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [activeTab, setActiveTab] = useState<'alerts' | 'patients'>('alerts')
   const [exporting, setExporting] = useState(false)
+  const [mqttConnected, setMqttConnected] = useState(false)
 
   useEffect(() => {
     fetch('/api/history')
@@ -35,6 +36,15 @@ export default function HistoryPage() {
         setError('ไม่สามารถโหลดข้อมูลได้')
         setLoading(false)
       })
+  }, [])
+
+  useEffect(() => {
+    const source = new EventSource('/api/mqtt-stream')
+    source.onopen = () => setMqttConnected(true)
+    source.onerror = () => setMqttConnected(false)
+    return () => {
+      source.close()
+    }
   }, [])
 
   function handleExport() {
@@ -67,7 +77,7 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <HeaderBar mqttConnected={false} />
+      <HeaderBar mqttConnected={mqttConnected} />
 
       <main className="max-w-[1440px] mx-auto p-6 flex flex-col gap-5">
         {/* Page Header */}
